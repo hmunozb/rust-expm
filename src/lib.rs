@@ -654,7 +654,7 @@ impl Expm {
         };
 
         // FIXME: Handle the info for error management.
-        let mut info;
+        let mut info= 0;
         unsafe{
         lapack::dgesv(n,
                       n,
