@@ -654,18 +654,29 @@ impl Expm {
         };
 
         // FIXME: Handle the info for error management.
-        let _ = unsafe {
-            lapacke::dgesv(
-                layout,
-                n,
-                n,
-                u_slice,
-                n,
-                pivot_slice,
-                v_slice,
-                n,
-            )
+        let mut info;
+        unsafe{
+        lapack::dgesv(n,
+                      n,
+                      u_slice,
+                      n,
+                      pivot_slice,
+                      v_slice,
+                      n,
+                        &mut info);
         };
+//        let _ = unsafe {
+//            lapacke::dgesv(
+//                layout,
+//                n,
+//                n,
+//                u_slice,
+//                n,
+//                pivot_slice,
+//                v_slice,
+//                n,
+//            )
+//        };
     }
 }
 
