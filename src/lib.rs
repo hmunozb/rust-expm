@@ -437,7 +437,7 @@ impl Expm {
         let eta_1 = d4_estimated.max(d6_estimated);
 
         if eta_1 <= THETA_3 && self.ell(3) == 0 {
-            println!("eta_1 condition");
+            //println!("eta_1 condition");
             self.solve_via_pade(PadeOrders::_3, v);
             return;
         }
@@ -469,7 +469,7 @@ impl Expm {
         let eta_2 = d4_precise.max(d6_estimated);
 
         if eta_2 <= THETA_5 && self.ell(5) == 0 {
-            println!("eta_2 condition");
+            //println!("eta_2 condition");
             self.solve_via_pade(PadeOrders::_5, v);
             return;
         }
@@ -503,7 +503,7 @@ impl Expm {
         let eta_3 = d6_precise.max(d8_estimated);
 
         if eta_3 <= THETA_7 && self.ell(7) == 0 {
-            println!("eta_3 (first) condition");
+            //println!("eta_3 (first) condition");
             self.solve_via_pade(PadeOrders::_7, v);
             return;
         }
@@ -532,7 +532,7 @@ impl Expm {
         }
 
         if eta_3 <= THETA_9 && self.ell(9) == 0 {
-            println!("eta_3 (second) condition");
+            //println!("eta_3 (second) condition");
             self.solve_via_pade(PadeOrders::_9, v);
             return;
         }
@@ -685,6 +685,9 @@ impl Expm {
 /// NOTE: Panics if input matrices `a` and `b` don't have matching dimensions, are not square,
 /// not in row-major order, or don't have the same dimension as the `Expm` object `expm` is
 /// called on.
+///
+/// NB: Now that I've replaced lapacke with lapack, it only works correctly with column-major
+/// data. Go figure. I just can't link lapacke on macOS correctly right now to save my life.
 pub fn expm<S1, S2>(a: &ArrayBase<S1, Ix2>, b: &mut ArrayBase<S2, Ix2>)
     where S1: Data<Elem=f64>,
           S2: DataMut<Elem=f64>,
