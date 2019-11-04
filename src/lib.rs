@@ -34,6 +34,10 @@ use ndarray::{
     Dimension,
     Zip
 };
+use alga::general::{ComplexField, SupersetOf, SubsetOf, RealField};
+
+use blas_traits::BlasScalar;
+use num_traits::real::Real;
 
 // Can we calculate these at compile time?
 const THETA_3: f64 = 1.495585217958292e-2;
@@ -121,10 +125,11 @@ trait PadeOrder {
     /// Maybe possible once RFC 2000 lands? See the PR https://github.com/rust-lang/rust/pull/53645
     fn coefficients() -> &'static [f64];
 
-    fn calculate_pade_sums<S1, S2, S3>(a: &ArrayBase<S1, Ix2>, a_powers: &[&ArrayBase<S1, Ix2>], u: &mut ArrayBase<S2, Ix2>, v: &mut ArrayBase<S3, Ix2>, work: &mut ArrayBase<S2, Ix2>)
-        where S1: Data<Elem=f64>,
-              S2: DataMut<Elem=f64>,
-              S3: DataMut<Elem=f64>;
+    fn calculate_pade_sums<S1, S2, S3, T>(a: &ArrayBase<S1, Ix2>, a_powers: &[&ArrayBase<S1, Ix2>], u: &mut ArrayBase<S2, Ix2>, v: &mut ArrayBase<S3, Ix2>, work: &mut ArrayBase<S2, Ix2>)
+        where S1: Data<Elem=T>,
+              S2: DataMut<Elem=T>,
+              S3: DataMut<Elem=T>,
+              T: BlasScalar;
 }
 
 macro_rules! impl_padeorder {
@@ -139,16 +144,17 @@ impl PadeOrder for $ty {
         &$const_coeff
     }
 
-    fn calculate_pade_sums<S1, S2, S3>(
+    fn calculate_pade_sums<S1, S2, S3, T>(
         a: &ArrayBase<S1, Ix2>,
         a_powers: &[&ArrayBase<S1, Ix2>],
         u: &mut ArrayBase<S2, Ix2>,
         v: &mut ArrayBase<S3, Ix2>,
         work: &mut ArrayBase<S2, Ix2>,
     )
-        where S1: Data<Elem=f64>,
-              S2: DataMut<Elem=f64>,
-              S3: DataMut<Elem=f64>,
+        where S1: Data<Elem=T>,
+              S2: DataMut<Elem=T>,
+              S3: DataMut<Elem=T>,
+              T: BlasScalar,
     {
         assert_eq!(a_powers.len(), ($m - 1)/2 + 1);
 
@@ -171,8 +177,8 @@ impl PadeOrder for $ty {
             _ => unreachable!()
         };
 
-        work.zip_mut_with(a_pow, |x, &y| *x = c_1 * y);
-        v.zip_mut_with(a_pow, |x, &y| *x = c_0 * y);
+        work.zip_mut_with(a_pow, |x, &y| *x = T::from_subset(&c_1) * y);
+        v.zip_mut_with(a_pow, |x, &y| *x = T::from_subset(&c_0) * y);
 
         // Rest of the iterator
         while let Some(item) = iterator.next() {
@@ -181,8 +187,8 @@ impl PadeOrder for $ty {
                 _ => unreachable!()
             };
 
-            work.zip_mut_with(a_pow, |x, &y| *x = *x + c_2k1 * y);
-            v.zip_mut_with(a_pow, |x, &y| *x = *x + c_2k * y);
+            work.zip_mut_with(a_pow, |x, &y| *x = *x + T::from_subset(&c_2k1) * y);
+            v.zip_mut_with(a_pow, |x, &y| *x = *x + T::from_subset(&c_2k) * y);
         }
 
         let (a_slice, a_layout) = as_slice_with_layout(a).expect("Matrix `a` not contiguous.");
@@ -190,24 +196,28 @@ impl PadeOrder for $ty {
         let (u_slice, u_layout) = as_slice_with_layout_mut(u).expect("Matrix `u` not contiguous.");
         assert_eq!(a_layout, u_layout, "Memory layout mismatch between matrices; currently only row major matrices are supported.");
         let layout = a_layout;
-        unsafe {
-            cblas::dgemm(
-                layout,
-                cblas::Transpose::None,
-                cblas::Transpose::None,
-                n,
-                n,
-                n,
-                1.0,
-                a_slice,
-                n,
-                work_slice,
-                n,
-                0.0,
-                u_slice,
-                n,
-            )
-        }
+        T::gemm(layout, cblas::Transpose::None, cblas::Transpose::None,
+                n, n, n,
+                T::one(), a_slice, n, work_slice, n,
+                T::zero(), u_slice, n,)
+//        unsafe {
+//            cblas::dgemm(
+//                layout,
+//                cblas::Transpose::None,
+//                cblas::Transpose::None,
+//                n,
+//                n,
+//                n,
+//                1.0,
+//                a_slice,
+//                n,
+//                work_slice,
+//                n,
+//                0.0,
+//                u_slice,
+//                n,
+//            )
+//        }
     }
 }
 
@@ -229,16 +239,18 @@ impl PadeOrder for PadeOrder_13 {
         &PADE_COEFF_13
     }
 
-    fn calculate_pade_sums<S1, S2, S3>(
+    fn calculate_pade_sums<S1, S2, S3, T>(
         a: &ArrayBase<S1, Ix2>,
         a_powers: &[&ArrayBase<S1, Ix2>],
         u: &mut ArrayBase<S2, Ix2>,
         v: &mut ArrayBase<S3, Ix2>,
         work: &mut ArrayBase<S2, Ix2>,
     )
-        where S1: Data<Elem=f64>,
-              S2: DataMut<Elem=f64>,
-              S3: DataMut<Elem=f64>,
+        where S1: Data<Elem=T>,
+              S2: DataMut<Elem=T>,
+              S3: DataMut<Elem=T>,
+              T: BlasScalar
+              ,
     {
         assert_eq!(a_powers.len(), (13 - 1)/2 + 1);
 
@@ -254,7 +266,10 @@ impl PadeOrder for PadeOrder_13 {
             .and(a_powers[2])
             .and(a_powers[3])
             .apply(|x, &a0, &a2, &a4, &a6| {
-                *x = *x + coefficients[1] * a0 + coefficients[3] * a2 + coefficients[5] * a4 + coefficients[7] * a6;
+                *x = *x + T::from_subset(&coefficients[1]) * a0
+                        + T::from_subset(&coefficients[3]) * a2
+                        + T::from_subset(&coefficients[5]) * a4
+                        + T::from_subset(&coefficients[7]) * a6;
         });
 
         {
@@ -263,24 +278,29 @@ impl PadeOrder for PadeOrder_13 {
             let (u_slice, u_layout) = as_slice_with_layout_mut(u).expect("Matrix `u` not contiguous.");
             assert_eq!(a_layout, u_layout, "Memory layout mismatch between matrices; currently only row major matrices are supported.");
             let layout = a_layout;
-            unsafe {
-                cblas::dgemm(
-                    layout,
-                    cblas::Transpose::None,
-                    cblas::Transpose::None,
-                    n as i32,
-                    n as i32,
-                    n as i32,
-                    1.0,
-                    a_slice,
-                    n as i32,
-                    work_slice,
-                    n as i32,
-                    0.0,
-                    u_slice,
-                    n as i32,
-                )
-            }
+            T::gemm(   layout, cblas::Transpose::None, cblas::Transpose::None,
+                        n as i32, n as i32, n as i32,
+                        T::one(), a_slice, n as i32, work_slice, n as i32,
+                        T::zero(), u_slice, n as i32);
+//
+//            unsafe {
+//                cblas::dgemm(
+//                    layout,
+//                    cblas::Transpose::None,
+//                    cblas::Transpose::None,
+//                    n as i32,
+//                    n as i32,
+//                    n as i32,
+//                    1.0,
+//                    a_slice,
+//                    n as i32,
+//                    work_slice,
+//                    n as i32,
+//                    0.0,
+//                    u_slice,
+//                    n as i32,
+//                )
+           // }
         }
 
         Zip::from(&mut *work)
@@ -288,7 +308,9 @@ impl PadeOrder for PadeOrder_13 {
             .and(a_powers[2])
             .and(a_powers[3])
             .apply(|x, &a2, &a4, &a6| {
-                *x = coefficients[8] * a2 + coefficients[10] * a4 + coefficients[12] * a6;
+                *x =    T::from_subset(&coefficients[8]) * a2
+                        + T::from_subset(&coefficients[10]) * a4
+                        + T::from_subset(&coefficients[12]) * a6;
         });
 
         {
@@ -297,24 +319,28 @@ impl PadeOrder for PadeOrder_13 {
             let (v_slice, v_layout) = as_slice_with_layout_mut(v).expect("Matrix `v` not contiguous.");
             assert_eq!(a6_layout, v_layout, "Memory layout mismatch between matrices; currently only row major matrices are supported.");
             let layout = a6_layout;
-            unsafe {
-                cblas::dgemm(
-                    layout,
-                    cblas::Transpose::None,
-                    cblas::Transpose::None,
-                    n as i32,
-                    n as i32,
-                    n as i32,
-                    1.0,
-                    a6_slice,
-                    n as i32,
-                    work_slice,
-                    n as i32,
-                    0.0,
-                    v_slice,
-                    n as i32,
-                )
-            }
+            T::gemm(layout, cblas::Transpose::None, cblas::Transpose::None,
+                     n as i32, n as i32, n as i32,
+                     T::one(), a6_slice, n as i32, work_slice, n as i32,
+                     T::zero(), v_slice, n as i32,);
+//            unsafe {
+//                cblas::dgemm(
+//                    layout,
+//                    cblas::Transpose::None,
+//                    cblas::Transpose::None,
+//                    n as i32,
+//                    n as i32,
+//                    n as i32,
+//                    1.0,
+//                    a6_slice,
+//                    n as i32,
+//                    work_slice,
+//                    n as i32,
+//                    0.0,
+//                    v_slice,
+//                    n as i32,
+//                )
+//            }
         }
 
         Zip::from(v)
@@ -323,43 +349,49 @@ impl PadeOrder for PadeOrder_13 {
             .and(a_powers[2])
             .and(a_powers[3])
             .apply(|x, &a0, &a2, &a4, &a6| {
-                *x = *x + coefficients[0] * a0 + coefficients[2] * a2 + coefficients[4] * a4 + coefficients[6] * a6;
+                *x = *x + T::from_subset(&coefficients[0]) * a0
+                        + T::from_subset(&coefficients[2]) * a2
+                        + T::from_subset(&coefficients[4]) * a4
+                        + T::from_subset(&coefficients[6]) * a6;
         })
     }
 }
 
 /// Storage for calculating the matrix exponential.
-pub struct Expm {
+pub struct Expm<T: BlasScalar> {
     n: usize,
     itmax: usize,
-    eye: Array2<f64>,
-    a1: Array2<f64>,
-    a2: Array2<f64>,
-    a4: Array2<f64>,
-    a6: Array2<f64>,
-    a8: Array2<f64>,
-    a_abs: Array2<f64>,
-    u: Array2<f64>,
-    work: Array2<f64>,
+    eye: Array2<T>,
+    a1: Array2<T>,
+    a2: Array2<T>,
+    a4: Array2<T>,
+    a6: Array2<T>,
+    a8: Array2<T>,
+    a_abs: Array2<T>,
+    u: Array2<T>,
+    work: Array2<T>,
     pivot: Array1<i32>,
-    normest1: Normest1,
+    normest1: Normest1<T>,
     layout: cblas::Layout,
 }
 
-impl Expm {
+impl<T: BlasScalar> Expm<T>
+//where   T::RealField : BlasScalar,
+//        f64: SubsetOf<T::RealField>
+{
     /// Allocates all space to calculate the matrix exponential for a square matrix of dimension
     /// n×n.
     pub fn new(n: usize) -> Self {
-        let eye = Array2::<f64>::eye(n);
-        let a1 = Array2::<f64>::zeros((n, n));
-        let a2 = Array2::<f64>::zeros((n, n));
-        let a4 = Array2::<f64>::zeros((n, n));
-        let a6 = Array2::<f64>::zeros((n, n));
-        let a8 = Array2::<f64>::zeros((n, n));
-        let a_abs = Array2::<f64>::zeros((n, n));
-        let u = Array2::<f64>::zeros((n, n));
-        let work = Array2::<f64>::zeros((n, n));
-        let pivot = Array1::<i32>::zeros(n);
+        let eye = Array2::eye(n);
+        let a1 = Array2::zeros((n, n));
+        let a2 = Array2::zeros((n, n));
+        let a4 = Array2::zeros((n, n));
+        let a6 = Array2::zeros((n, n));
+        let a8 = Array2::zeros((n, n));
+        let a_abs = Array2::zeros((n, n));
+        let u = Array2::zeros((n, n));
+        let work = Array2::zeros((n, n));
+        let pivot = Array1::zeros(n);
         let layout = cblas::Layout::RowMajor;
 
         // TODO: Investigate what an optimal value for t is when estimating the 1-norm.
@@ -393,8 +425,8 @@ impl Expm {
     /// not in row-major order, or don't have the same dimension as the `Expm` object `expm` is
     /// called on.
     pub fn expm<S1, S2>(&mut self, a: &ArrayBase<S1, Ix2>, b: &mut ArrayBase<S2, Ix2>)
-        where S1: Data<Elem=f64>,
-              S2: DataMut<Elem=f64>,
+        where S1: Data<Elem=T>,
+              S2: DataMut<Elem=T>,
     {
         assert_eq!(a.dim(), b.dim(), "Input matrices `a` and `b` have to have matching dimensions.");
         let (n_rows, n_cols) = a.dim();
@@ -412,31 +444,37 @@ impl Expm {
             let (a_slice, a_layout) = as_slice_with_layout(&self.a1).expect("Matrix `a` not contiguous.");
             let (a2_slice, _) = as_slice_with_layout_mut(&mut self.a2).expect("Matrix `a2` not contiguous.");
             assert_eq!(a_layout, self.layout, "Memory layout mismatch between matrices; currently only row major matrices are supported.");
-            unsafe {
-                cblas::dgemm(
-                    self.layout,
-                    cblas::Transpose::None,
-                    cblas::Transpose::None,
-                    n,
-                    n,
-                    n,
-                    1.0,
-                    a_slice,
-                    n,
-                    a_slice,
-                    n,
-                    0.0,
-                    a2_slice,
-                    n as i32,
-                )
-            }
+            T::gemm(self.layout, cblas::Transpose::None, cblas::Transpose::None,
+                     n, n, n,
+                     T::one(), a_slice, n, a_slice, n,
+                     T::zero(), a2_slice, n as i32,);
+//            unsafe {
+//                cblas::dgemm(
+//                    self.layout,
+//                    cblas::Transpose::None,
+//                    cblas::Transpose::None,
+//                    n,
+//                    n,
+//                    n,
+//                    1.0,
+//                    a_slice,
+//                    n,
+//                    a_slice,
+//                    n,
+//                    0.0,
+//                    a2_slice,
+//                    n as i32,
+//                )
+//            }
         }
 
-        let d4_estimated = self.normest1.normest1_pow(&self.a2, 2, self.itmax).powf(1.0/4.0);
-        let d6_estimated = self.normest1.normest1_pow(&self.a2, 3, self.itmax).powf(1.0/6.0);
+        let d4_estimated = self.normest1.normest1_pow(&self.a2, 2, self.itmax)
+            .powf(T::RealField::from_subset(&(1.0/4.0)));
+        let d6_estimated = self.normest1.normest1_pow(&self.a2, 3, self.itmax)
+            .powf(T::RealField::from_subset(&(1.0/6.0)) );
         let eta_1 = d4_estimated.max(d6_estimated);
 
-        if eta_1 <= THETA_3 && self.ell(3) == 0 {
+        if eta_1 <= T::RealField::from_subset(&THETA_3) && self.ell(3) == 0 {
             //println!("eta_1 condition");
             self.solve_via_pade(PadeOrders::_3, v);
             return;
@@ -445,30 +483,35 @@ impl Expm {
         {
             let (a2_slice, _) = as_slice_with_layout(&self.a2).expect("Matrix `a2` not contiguous.");
             let (a4_slice, _) = as_slice_with_layout_mut(&mut self.a4).expect("Matrix `a4` not contiguous.");
-            unsafe {
-                cblas::dgemm(
-                    self.layout,
-                    cblas::Transpose::None,
-                    cblas::Transpose::None,
-                    self.n as i32,
-                    self.n as i32,
-                    self.n as i32,
-                    1.0,
-                    a2_slice,
-                    n as i32,
-                    a2_slice,
-                    n as i32,
-                    0.0,
-                    a4_slice,
-                    n as i32,
-                )
-            }
+            T::gemm(self.layout, cblas::Transpose::None, cblas::Transpose::None,
+                    self.n as i32, self.n as i32, self.n as i32,
+                    T::one(), a2_slice, n as i32, a2_slice, n as i32,
+                    T::zero(), a4_slice, n as i32,);
+//            unsafe {
+//                cblas::dgemm(
+//                    self.layout,
+//                    cblas::Transpose::None,
+//                    cblas::Transpose::None,
+//                    self.n as i32,
+//                    self.n as i32,
+//                    self.n as i32,
+//                    1.0,
+//                    a2_slice,
+//                    n as i32,
+//                    a2_slice,
+//                    n as i32,
+//                    0.0,
+//                    a4_slice,
+//                    n as i32,
+//                )
+//            }
         }
 
-        let d4_precise = self.normest1.normest1(&self.a4, self.itmax).powf(1.0/4.0);
-        let eta_2 = d4_precise.max(d6_estimated);
+        let d4_precise = self.normest1.normest1(&self.a4, self.itmax)
+            .powf(T::RealField::from_subset(&(1.0/4.0)));
+        let eta_2 = d4_precise.max(d6_estimated.clone());
 
-        if eta_2 <= THETA_5 && self.ell(5) == 0 {
+        if eta_2 <= T::RealField::from_subset(&THETA_5) && self.ell(5) == 0 {
             //println!("eta_2 condition");
             self.solve_via_pade(PadeOrders::_5, v);
             return;
@@ -478,31 +521,36 @@ impl Expm {
             let (a2_slice, _) = as_slice_with_layout(&self.a2).expect("Matrix `a2` not contiguous.");
             let (a4_slice, _) = as_slice_with_layout(&self.a4).expect("Matrix `a4` not contiguous.");
             let (a6_slice, _) = as_slice_with_layout_mut(&mut self.a6).expect("Matrix `a6` not contiguous.");
-            unsafe {
-                cblas::dgemm(
-                    self.layout,
-                    cblas::Transpose::None,
-                    cblas::Transpose::None,
-                    self.n as i32,
-                    self.n as i32,
-                    self.n as i32,
-                    1.0,
-                    a2_slice,
-                    n as i32,
-                    a4_slice,
-                    n as i32,
-                    0.0,
-                    a6_slice,
-                    n as i32,
-                )
-            }
+            T::gemm(self.layout, cblas::Transpose::None, cblas::Transpose::None,
+                    self.n as i32, self.n as i32, self.n as i32,
+                    T::one(), a2_slice, n as i32, a4_slice, n as i32,
+                    T::zero(), a6_slice, n as i32,);
+//            unsafe {
+//                cblas::dgemm(
+//                    self.layout,
+//                    cblas::Transpose::None,
+//                    cblas::Transpose::None,
+//                    self.n as i32,
+//                    self.n as i32,
+//                    self.n as i32,
+//                    1.0,
+//                    a2_slice,
+//                    n as i32,
+//                    a4_slice,
+//                    n as i32,
+//                    0.0,
+//                    a6_slice,
+//                    n as i32,
+//                )
+//            }
         }
 
-        let d6_precise = self.normest1.normest1(&self.a6, self.itmax).powf(1.0/6.0);
+        let d6_precise = self.normest1.normest1(&self.a6, self.itmax)
+            .powf(T::RealField::from_subset(&(1.0/6.0)));
         let d8_estimated = self.normest1.normest1_pow(&self.a4, 2, self.itmax);
         let eta_3 = d6_precise.max(d8_estimated);
 
-        if eta_3 <= THETA_7 && self.ell(7) == 0 {
+        if eta_3 <= T::RealField::from_subset(&THETA_7) && self.ell(7) == 0 {
             //println!("eta_3 (first) condition");
             self.solve_via_pade(PadeOrders::_7, v);
             return;
@@ -511,44 +559,51 @@ impl Expm {
         {
             let (a4_slice, _) = as_slice_with_layout(&self.a4).expect("Matrix `a4` not contiguous.");
             let (a8_slice, _) = as_slice_with_layout_mut(&mut self.a8).expect("Matrix `a8` not contiguous.");
-            unsafe {
-                cblas::dgemm(
-                    self.layout,
-                    cblas::Transpose::None,
-                    cblas::Transpose::None,
-                    self.n as i32,
-                    self.n as i32,
-                    self.n as i32,
-                    1.0,
-                    a4_slice,
-                    n as i32,
-                    a4_slice,
-                    n as i32,
-                    0.0,
-                    a8_slice,
-                    n as i32,
-                )
-            }
+            T::gemm(self.layout, cblas::Transpose::None, cblas::Transpose::None,
+                    self.n as i32, self.n as i32, self.n as i32,
+                    T::one(), a4_slice, n as i32, a4_slice, n as i32,
+                    T::zero(), a8_slice, n as i32,);
+//            unsafe {
+//                cblas::dgemm(
+//                    self.layout,
+//                    cblas::Transpose::None,
+//                    cblas::Transpose::None,
+//                    self.n as i32,
+//                    self.n as i32,
+//                    self.n as i32,
+//                    1.0,
+//                    a4_slice,
+//                    n as i32,
+//                    a4_slice,
+//                    n as i32,
+//                    0.0,
+//                    a8_slice,
+//                    n as i32,
+//                )
+//            }
         }
 
-        if eta_3 <= THETA_9 && self.ell(9) == 0 {
+        if eta_3 <= T::RealField::from_subset(&THETA_9) && self.ell(9) == 0 {
             //println!("eta_3 (second) condition");
             self.solve_via_pade(PadeOrders::_9, v);
             return;
         }
 
-        let eta_4 = d8_estimated.max(self.normest1.normest1_prod(&[&self.a4, &self.a6], self.itmax).powf(1.0/10.0));
+        let eta_4 = d8_estimated.max(
+            self.normest1.normest1_prod(&[&self.a4, &self.a6], self.itmax)
+                .powf(T::RealField::from_subset(&(1.0/10.0))));
         let eta_5 = eta_3.min(eta_4);
 
         use std::f64;
         use std::cmp;
-        let mut s = cmp::max(f64::ceil(f64::log2(eta_5/THETA_13)) as i32, 0);
-        self.a1.mapv_inplace(|x| x / 2f64.powi(s));
+        let mut s = cmp::max(f64::ceil(f64::log2(eta_5.to_subset().unwrap()/THETA_13)) as i32, 0);
+        let _2 = T::from_subset(&2.0);
+        self.a1.mapv_inplace(|x| x / _2.powi(s));
         s = s + self.ell(13);
-        self.a1.zip_mut_with(a, |x, &y| *x = y / 2f64.powi(s));
-        self.a2.mapv_inplace(|x| x / 2f64.powi(2*s));
-        self.a4.mapv_inplace(|x| x / 2f64.powi(4*s));
-        self.a6.mapv_inplace(|x| x / 2f64.powi(6*s));
+        self.a1.zip_mut_with(a, |x, &y| *x = y / _2.powi(s));
+        self.a2.mapv_inplace(|x| x / _2.powi(2*s));
+        self.a4.mapv_inplace(|x| x / _2.powi(4*s));
+        self.a6.mapv_inplace(|x| x / _2.powi(6*s));
 
         self.solve_via_pade(PadeOrders::_13, v);
 
@@ -560,24 +615,28 @@ impl Expm {
         // NOTE: v initially contains r after `solve_via_pade`.
         let (v_slice, _) = as_slice_with_layout_mut(v).expect("Matrix `v` not contiguous.");
         for _ in 0..s {
-            unsafe {
-                cblas::dgemm(
-                    self.layout,
-                    cblas::Transpose::None,
-                    cblas::Transpose::None,
-                    self.n as i32,
-                    self.n as i32,
-                    self.n as i32,
-                    1.0,
-                    v_slice,
-                    n as i32,
-                    v_slice,
-                    n as i32,
-                    0.0,
-                    u_slice,
-                    n as i32,
-                )
-            }
+            T::gemm(self.layout, cblas::Transpose::None, cblas::Transpose::None,
+                    self.n as i32, self.n as i32, self.n as i32,
+                    T::one(), v_slice, n as i32, v_slice, n as i32,
+                    T::zero(), u_slice, n as i32,);
+//            unsafe {
+//                cblas::dgemm(
+//                    self.layout,
+//                    cblas::Transpose::None,
+//                    cblas::Transpose::None,
+//                    self.n as i32,
+//                    self.n as i32,
+//                    self.n as i32,
+//                    1.0,
+//                    v_slice,
+//                    n as i32,
+//                    v_slice,
+//                    n as i32,
+//                    0.0,
+//                    u_slice,
+//                    n as i32,
+//                )
+//            }
 
             u_slice.swap_with_slice(v_slice);
         }
@@ -589,25 +648,26 @@ impl Expm {
     fn ell(&mut self, m: usize) -> i32 {
         Zip::from(&mut self.a_abs)
             .and(&self.a1)
-            .apply(|x, &y| *x = y.abs());
+            .apply(|x, &y| *x = T::from_real(y.abs()));
 
-        let c2m1 = pade_error_coefficient(m as u64);
+        let c2m1  = T::RealField::from_subset( &pade_error_coefficient(m as u64));
 
         let norm_abs_a_2m1 = self.normest1.normest1_pow(&self.a_abs, 2*m + 1, self.itmax);
         let norm_a = self.normest1.normest1(&self.a1, self.itmax);
         let alpha = c2m1.abs() * norm_abs_a_2m1 / norm_a;
 
         // The unit roundoff, defined as half the machine epsilon.
-        let u = std::f64::EPSILON / 2.0;
+        let u  = T::RealField::from_subset(&(std::f64::EPSILON / 2.0));
 
         use std::f64;
         use std::cmp;
 
-        cmp::max(0, f64::ceil( f64::log2(alpha/u) / (2 * m) as f64 ) as i32)
+        cmp::max(0, T::RealField::ceil( T::RealField::log2(
+            alpha/u) / T::RealField::from_subset(&((2 * m) as f64)) ).to_subset().unwrap() as i32)
     }
 
     fn solve_via_pade<S>(&mut self, pade_order: PadeOrders, v: &mut ArrayBase<S, Ix2>)
-        where S: DataMut<Elem=f64>,
+        where S: DataMut<Elem=T>,
     {
         use PadeOrders::*;
 
@@ -654,18 +714,32 @@ impl Expm {
         };
 
         // FIXME: Handle the info for error management.
-        let _ = unsafe {
-            lapacke::dgesv(
-                layout,
-                n,
-                n,
-                u_slice,
-                n,
-                pivot_slice,
-                v_slice,
-                n,
-            )
-        };
+        let info=
+            T::gesv(layout, n, n,
+                    u_slice, n, pivot_slice,
+                    v_slice, n);
+//        unsafe{
+//        lapack::dgesv(n,
+//                      n,
+//                      u_slice,
+//                      n,
+//                      pivot_slice,
+//                      v_slice,
+//                      n,
+//                        &mut info);
+//        };
+//        let _ = unsafe {
+//            lapacke::dgesv(
+//                layout,
+//                n,
+//                n,
+//                u_slice,
+//                n,
+//                pivot_slice,
+//                v_slice,
+//                n,
+//            )
+//        };
     }
 }
 
@@ -677,9 +751,9 @@ impl Expm {
 ///
 /// NB: Now that I've replaced lapacke with lapack, it only works correctly with column-major
 /// data. Go figure. I just can't link lapacke on macOS correctly right now to save my life.
-pub fn expm<S1, S2>(a: &ArrayBase<S1, Ix2>, b: &mut ArrayBase<S2, Ix2>)
-    where S1: Data<Elem=f64>,
-          S2: DataMut<Elem=f64>,
+pub fn expm<S1, S2, T: BlasScalar>(a: &ArrayBase<S1, Ix2>, b: &mut ArrayBase<S2, Ix2>)
+    where S1: Data<Elem=T>,
+          S2: DataMut<Elem=T>,
 {
     let (n, _) = a.dim();
 
@@ -793,5 +867,34 @@ mod tests {
         for &elem in &b.diag() {
             assert_ulps_eq!(elem, 1f64.exp(), max_ulps=1);
         }
+    }
+
+    #[test]
+    fn complex_exp(){
+        use alga::general::{RealField, ComplexField};
+        use approx::assert_relative_eq;
+        use num_complex::Complex64 as c64;
+        use num_traits::{Zero, One};
+
+        let _i = c64::i();
+
+        let _sigma_mat = Array2::from_shape_vec(
+            (2, 2), vec![c64::zero(), c64::one(), c64::one(), c64::zero()]).unwrap();
+        let theta = f64::pi()/5.0;
+
+        let a = &_sigma_mat * c64::from(theta) * _i ;
+        let expected = Array2::eye(2) * theta.cos() + _sigma_mat * _i * theta.sin() ;
+
+        let mut b = Array2::zeros((2,2));
+        crate::expm(&a, &mut b);
+        println!("Matrix: {}", a);
+        println!("Result: {}", b);
+        println!("Expected: {}", expected);
+
+        for (b1, b2) in b.iter().zip(expected.iter()){
+            assert_relative_eq!((b1 - b2).abs(), 0.0);
+        }
+
+
     }
 }

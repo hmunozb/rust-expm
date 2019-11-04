@@ -12,12 +12,21 @@ categories = ["science"]
 keywords = ["matrix", "exponential", "linalg", "ndarray", "expm"]
 
 [dependencies]
+alga = "0.9.2"
 cblas = "0.2"
 condest = "0.2"
 lapacke = "0.2"
 ndarray = "0.12"
+num-traits = "0.2.8"
 statrs = "0.10"
+
+blas-traits = {git="https://github.com/hmunozb/blas-traits"}
+
+[patch.crates-io]
+condest = {git="https://github.com/hmunozb/rust-condest", branch="generic-scalar"}
 
 [dev-dependencies]
 approx = "0.3.1"
+num-complex = "0.2.3"
 openblas-src = "0.7"
+lapacke-sys = "0.1.4"
