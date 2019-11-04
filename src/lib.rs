@@ -200,24 +200,6 @@ impl PadeOrder for $ty {
                 n, n, n,
                 T::one(), a_slice, n, work_slice, n,
                 T::zero(), u_slice, n,)
-//        unsafe {
-//            cblas::dgemm(
-//                layout,
-//                cblas::Transpose::None,
-//                cblas::Transpose::None,
-//                n,
-//                n,
-//                n,
-//                1.0,
-//                a_slice,
-//                n,
-//                work_slice,
-//                n,
-//                0.0,
-//                u_slice,
-//                n,
-//            )
-//        }
     }
 }
 
@@ -282,25 +264,6 @@ impl PadeOrder for PadeOrder_13 {
                         n as i32, n as i32, n as i32,
                         T::one(), a_slice, n as i32, work_slice, n as i32,
                         T::zero(), u_slice, n as i32);
-//
-//            unsafe {
-//                cblas::dgemm(
-//                    layout,
-//                    cblas::Transpose::None,
-//                    cblas::Transpose::None,
-//                    n as i32,
-//                    n as i32,
-//                    n as i32,
-//                    1.0,
-//                    a_slice,
-//                    n as i32,
-//                    work_slice,
-//                    n as i32,
-//                    0.0,
-//                    u_slice,
-//                    n as i32,
-//                )
-           // }
         }
 
         Zip::from(&mut *work)
@@ -323,24 +286,6 @@ impl PadeOrder for PadeOrder_13 {
                      n as i32, n as i32, n as i32,
                      T::one(), a6_slice, n as i32, work_slice, n as i32,
                      T::zero(), v_slice, n as i32,);
-//            unsafe {
-//                cblas::dgemm(
-//                    layout,
-//                    cblas::Transpose::None,
-//                    cblas::Transpose::None,
-//                    n as i32,
-//                    n as i32,
-//                    n as i32,
-//                    1.0,
-//                    a6_slice,
-//                    n as i32,
-//                    work_slice,
-//                    n as i32,
-//                    0.0,
-//                    v_slice,
-//                    n as i32,
-//                )
-//            }
         }
 
         Zip::from(v)
@@ -448,24 +393,6 @@ impl<T: BlasScalar> Expm<T>
                      n, n, n,
                      T::one(), a_slice, n, a_slice, n,
                      T::zero(), a2_slice, n as i32,);
-//            unsafe {
-//                cblas::dgemm(
-//                    self.layout,
-//                    cblas::Transpose::None,
-//                    cblas::Transpose::None,
-//                    n,
-//                    n,
-//                    n,
-//                    1.0,
-//                    a_slice,
-//                    n,
-//                    a_slice,
-//                    n,
-//                    0.0,
-//                    a2_slice,
-//                    n as i32,
-//                )
-//            }
         }
 
         let d4_estimated = self.normest1.normest1_pow(&self.a2, 2, self.itmax)
@@ -487,24 +414,6 @@ impl<T: BlasScalar> Expm<T>
                     self.n as i32, self.n as i32, self.n as i32,
                     T::one(), a2_slice, n as i32, a2_slice, n as i32,
                     T::zero(), a4_slice, n as i32,);
-//            unsafe {
-//                cblas::dgemm(
-//                    self.layout,
-//                    cblas::Transpose::None,
-//                    cblas::Transpose::None,
-//                    self.n as i32,
-//                    self.n as i32,
-//                    self.n as i32,
-//                    1.0,
-//                    a2_slice,
-//                    n as i32,
-//                    a2_slice,
-//                    n as i32,
-//                    0.0,
-//                    a4_slice,
-//                    n as i32,
-//                )
-//            }
         }
 
         let d4_precise = self.normest1.normest1(&self.a4, self.itmax)
@@ -525,24 +434,6 @@ impl<T: BlasScalar> Expm<T>
                     self.n as i32, self.n as i32, self.n as i32,
                     T::one(), a2_slice, n as i32, a4_slice, n as i32,
                     T::zero(), a6_slice, n as i32,);
-//            unsafe {
-//                cblas::dgemm(
-//                    self.layout,
-//                    cblas::Transpose::None,
-//                    cblas::Transpose::None,
-//                    self.n as i32,
-//                    self.n as i32,
-//                    self.n as i32,
-//                    1.0,
-//                    a2_slice,
-//                    n as i32,
-//                    a4_slice,
-//                    n as i32,
-//                    0.0,
-//                    a6_slice,
-//                    n as i32,
-//                )
-//            }
         }
 
         let d6_precise = self.normest1.normest1(&self.a6, self.itmax)
@@ -563,24 +454,6 @@ impl<T: BlasScalar> Expm<T>
                     self.n as i32, self.n as i32, self.n as i32,
                     T::one(), a4_slice, n as i32, a4_slice, n as i32,
                     T::zero(), a8_slice, n as i32,);
-//            unsafe {
-//                cblas::dgemm(
-//                    self.layout,
-//                    cblas::Transpose::None,
-//                    cblas::Transpose::None,
-//                    self.n as i32,
-//                    self.n as i32,
-//                    self.n as i32,
-//                    1.0,
-//                    a4_slice,
-//                    n as i32,
-//                    a4_slice,
-//                    n as i32,
-//                    0.0,
-//                    a8_slice,
-//                    n as i32,
-//                )
-//            }
         }
 
         if eta_3 <= T::RealField::from_subset(&THETA_9) && self.ell(9) == 0 {
@@ -619,25 +492,6 @@ impl<T: BlasScalar> Expm<T>
                     self.n as i32, self.n as i32, self.n as i32,
                     T::one(), v_slice, n as i32, v_slice, n as i32,
                     T::zero(), u_slice, n as i32,);
-//            unsafe {
-//                cblas::dgemm(
-//                    self.layout,
-//                    cblas::Transpose::None,
-//                    cblas::Transpose::None,
-//                    self.n as i32,
-//                    self.n as i32,
-//                    self.n as i32,
-//                    1.0,
-//                    v_slice,
-//                    n as i32,
-//                    v_slice,
-//                    n as i32,
-//                    0.0,
-//                    u_slice,
-//                    n as i32,
-//                )
-//            }
-
             u_slice.swap_with_slice(v_slice);
         }
     }
@@ -718,28 +572,6 @@ impl<T: BlasScalar> Expm<T>
             T::gesv(layout, n, n,
                     u_slice, n, pivot_slice,
                     v_slice, n);
-//        unsafe{
-//        lapack::dgesv(n,
-//                      n,
-//                      u_slice,
-//                      n,
-//                      pivot_slice,
-//                      v_slice,
-//                      n,
-//                        &mut info);
-//        };
-//        let _ = unsafe {
-//            lapacke::dgesv(
-//                layout,
-//                n,
-//                n,
-//                u_slice,
-//                n,
-//                pivot_slice,
-//                v_slice,
-//                n,
-//            )
-//        };
     }
 }
 
@@ -748,9 +580,6 @@ impl<T: BlasScalar> Expm<T>
 /// NOTE: Panics if input matrices `a` and `b` don't have matching dimensions, are not square,
 /// not in row-major order, or don't have the same dimension as the `Expm` object `expm` is
 /// called on.
-///
-/// NB: Now that I've replaced lapacke with lapack, it only works correctly with column-major
-/// data. Go figure. I just can't link lapacke on macOS correctly right now to save my life.
 pub fn expm<S1, S2, T: BlasScalar>(a: &ArrayBase<S1, Ix2>, b: &mut ArrayBase<S2, Ix2>)
     where S1: Data<Elem=T>,
           S2: DataMut<Elem=T>,
@@ -877,9 +706,12 @@ mod tests {
         use num_traits::{Zero, One};
 
         let _i = c64::i();
-
-        let _sigma_mat = Array2::from_shape_vec(
+        let _sigma_x = Array2::from_shape_vec(
             (2, 2), vec![c64::zero(), c64::one(), c64::one(), c64::zero()]).unwrap();
+        let _sigma_y = Array2::from_shape_vec(
+            (2, 2), vec![c64::zero(), -_i, _i, c64::zero()]).unwrap();
+
+        let _sigma_mat = (&_sigma_x + &_sigma_y)/c64::from(2.0.sqrt());
         let theta = f64::pi()/5.0;
 
         let a = &_sigma_mat * c64::from(theta) * _i ;
@@ -894,7 +726,5 @@ mod tests {
         for (b1, b2) in b.iter().zip(expected.iter()){
             assert_relative_eq!((b1 - b2).abs(), 0.0);
         }
-
-
     }
 }
