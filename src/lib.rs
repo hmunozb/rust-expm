@@ -706,7 +706,7 @@ mod tests {
         use num_traits::{Zero, One};
 
         let _i = c64::i();
-        let _sigma_x = Array2::from_shape_vec(
+        let _sigma_x = Array2::<c64>::from_shape_vec(
             (2, 2), vec![c64::zero(), c64::one(), c64::one(), c64::zero()]).unwrap();
         let _sigma_y = Array2::from_shape_vec(
             (2, 2), vec![c64::zero(), -_i, _i, c64::zero()]).unwrap();
@@ -715,7 +715,8 @@ mod tests {
         let theta = f64::pi()/5.0;
 
         let a = &_sigma_mat * c64::from(theta) * _i ;
-        let expected = Array2::eye(2) * theta.cos() + _sigma_mat * _i * theta.sin() ;
+        let expected = Array2::<c64>::eye(2) * theta.cos()
+            + _sigma_mat * _i * theta.sin() ;
 
         let mut b = Array2::zeros((2,2));
         crate::expm(&a, &mut b);
