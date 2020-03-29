@@ -34,10 +34,9 @@ use ndarray::{
     Dimension,
     Zip
 };
-use alga::general::{ComplexField, SupersetOf, SubsetOf, RealField};
+use alga::general::{ComplexField, SupersetOf, RealField};
 
-use blas_traits::BlasScalar;
-use num_traits::real::Real;
+use lapack_traits::LapackScalar;
 
 // Can we calculate these at compile time?
 const THETA_3: f64 = 1.495585217958292e-2;
@@ -129,7 +128,7 @@ trait PadeOrder {
         where S1: Data<Elem=T>,
               S2: DataMut<Elem=T>,
               S3: DataMut<Elem=T>,
-              T: BlasScalar;
+              T: LapackScalar;
 }
 
 macro_rules! impl_padeorder {
@@ -154,7 +153,7 @@ impl PadeOrder for $ty {
         where S1: Data<Elem=T>,
               S2: DataMut<Elem=T>,
               S3: DataMut<Elem=T>,
-              T: BlasScalar,
+              T: LapackScalar,
     {
         assert_eq!(a_powers.len(), ($m - 1)/2 + 1);
 
@@ -231,7 +230,7 @@ impl PadeOrder for PadeOrder_13 {
         where S1: Data<Elem=T>,
               S2: DataMut<Elem=T>,
               S3: DataMut<Elem=T>,
-              T: BlasScalar
+              T: LapackScalar
               ,
     {
         assert_eq!(a_powers.len(), (13 - 1)/2 + 1);
@@ -303,7 +302,7 @@ impl PadeOrder for PadeOrder_13 {
 }
 
 /// Storage for calculating the matrix exponential.
-pub struct Expm<T: BlasScalar> {
+pub struct Expm<T: LapackScalar> {
     n: usize,
     itmax: usize,
     eye: Array2<T>,
@@ -320,8 +319,8 @@ pub struct Expm<T: BlasScalar> {
     layout: cblas::Layout,
 }
 
-impl<T: BlasScalar> Expm<T>
-//where   T::RealField : BlasScalar,
+impl<T: LapackScalar> Expm<T>
+//where   T::RealField : LapackScalar,
 //        f64: SubsetOf<T::RealField>
 {
     /// Allocates all space to calculate the matrix exponential for a square matrix of dimension
@@ -568,7 +567,7 @@ impl<T: BlasScalar> Expm<T>
         };
 
         // FIXME: Handle the info for error management.
-        let info=
+        let _info=
             T::gesv(layout, n, n,
                     u_slice, n, pivot_slice,
                     v_slice, n);
@@ -580,7 +579,7 @@ impl<T: BlasScalar> Expm<T>
 /// NOTE: Panics if input matrices `a` and `b` don't have matching dimensions, are not square,
 /// not in row-major order, or don't have the same dimension as the `Expm` object `expm` is
 /// called on.
-pub fn expm<S1, S2, T: BlasScalar>(a: &ArrayBase<S1, Ix2>, b: &mut ArrayBase<S2, Ix2>)
+pub fn expm<S1, S2, T: LapackScalar>(a: &ArrayBase<S1, Ix2>, b: &mut ArrayBase<S2, Ix2>)
     where S1: Data<Elem=T>,
           S2: DataMut<Elem=T>,
 {

@@ -1,6 +1,6 @@
 [package]
 name = "expm"
-version = "0.1.2"
+version = "0.2.0"
 authors = ["Richard Janis Goldschmidt <janis.beckert@gmail.com>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -12,8 +12,8 @@ categories = ["science"]
 keywords = ["matrix", "exponential", "linalg", "ndarray", "expm"]
 
 [dependencies]
-alga = "0.9.2"
-blas-traits = {git="https://github.com/hmunozb/blas-traits"}
+alga = "0.9"
+lapack-traits = "0.1.0"
 cblas = "0.2"
 condest = {git="https://github.com/hmunozb/rust-condest", branch="generic-scalar"}
 lapacke = "0.2"
@@ -25,7 +25,5 @@ statrs = "0.10"
 [dev-dependencies]
 approx = "0.3.1"
 num-complex = "0.2.3"
-#openblas-src = "0.7"
-openblas-src = {version="0.7", default-features=false, features=["system"]}
-#cblas-sys = "0.1.4"
-lapacke-sys = "0.1.4"
+#openblas-src = "0.9"
+openblas-src = {version="0.9", default-features=false, features=["system"]}
