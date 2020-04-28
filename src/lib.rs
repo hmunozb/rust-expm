@@ -34,9 +34,8 @@ use ndarray::{
     Dimension,
     Zip
 };
-use alga::general::{ComplexField, SupersetOf, RealField};
 
-use lapack_traits::LapackScalar;
+use lapack_traits::{LapackScalar, SupersetOf, ComplexField, RealField};
 
 // Can we calculate these at compile time?
 const THETA_3: f64 = 1.495585217958292e-2;
@@ -195,10 +194,10 @@ impl PadeOrder for $ty {
         let (u_slice, u_layout) = as_slice_with_layout_mut(u).expect("Matrix `u` not contiguous.");
         assert_eq!(a_layout, u_layout, "Memory layout mismatch between matrices; currently only row major matrices are supported.");
         let layout = a_layout;
-        T::gemm(layout, cblas::Transpose::None, cblas::Transpose::None,
-                n, n, n,
-                T::one(), a_slice, n, work_slice, n,
-                T::zero(), u_slice, n,)
+        unsafe {T::gemm(layout, cblas::Transpose::None, cblas::Transpose::None,
+                        n, n, n,
+                        T::one(), a_slice, n, work_slice, n,
+                        T::zero(), u_slice, n,)}
     }
 }
 
@@ -259,10 +258,12 @@ impl PadeOrder for PadeOrder_13 {
             let (u_slice, u_layout) = as_slice_with_layout_mut(u).expect("Matrix `u` not contiguous.");
             assert_eq!(a_layout, u_layout, "Memory layout mismatch between matrices; currently only row major matrices are supported.");
             let layout = a_layout;
-            T::gemm(   layout, cblas::Transpose::None, cblas::Transpose::None,
+            unsafe{
+                T::gemm(layout, cblas::Transpose::None, cblas::Transpose::None,
                         n as i32, n as i32, n as i32,
                         T::one(), a_slice, n as i32, work_slice, n as i32,
-                        T::zero(), u_slice, n as i32);
+                        T::zero(), u_slice, n as i32)
+            };
         }
 
         Zip::from(&mut *work)
@@ -281,10 +282,12 @@ impl PadeOrder for PadeOrder_13 {
             let (v_slice, v_layout) = as_slice_with_layout_mut(v).expect("Matrix `v` not contiguous.");
             assert_eq!(a6_layout, v_layout, "Memory layout mismatch between matrices; currently only row major matrices are supported.");
             let layout = a6_layout;
-            T::gemm(layout, cblas::Transpose::None, cblas::Transpose::None,
-                     n as i32, n as i32, n as i32,
-                     T::one(), a6_slice, n as i32, work_slice, n as i32,
-                     T::zero(), v_slice, n as i32,);
+            unsafe{
+                T::gemm(layout, cblas::Transpose::None, cblas::Transpose::None,
+                        n as i32, n as i32, n as i32,
+                        T::one(), a6_slice, n as i32, work_slice, n as i32,
+                        T::zero(), v_slice, n as i32, )
+            };
         }
 
         Zip::from(v)
@@ -384,15 +387,15 @@ impl<T: LapackScalar> Expm<T>
 
         let n = self.n as i32;
 
-        {
-            let (a_slice, a_layout) = as_slice_with_layout(&self.a1).expect("Matrix `a` not contiguous.");
-            let (a2_slice, _) = as_slice_with_layout_mut(&mut self.a2).expect("Matrix `a2` not contiguous.");
-            assert_eq!(a_layout, self.layout, "Memory layout mismatch between matrices; currently only row major matrices are supported.");
+        let (a_slice, a_layout) = as_slice_with_layout(&self.a1).expect("Matrix `a` not contiguous.");
+        let (a2_slice, _) = as_slice_with_layout_mut(&mut self.a2).expect("Matrix `a2` not contiguous.");
+        assert_eq!(a_layout, self.layout, "Memory layout mismatch between matrices; currently only row major matrices are supported.");
+        unsafe {
             T::gemm(self.layout, cblas::Transpose::None, cblas::Transpose::None,
-                     n, n, n,
-                     T::one(), a_slice, n, a_slice, n,
-                     T::zero(), a2_slice, n as i32,);
-        }
+                    n, n, n,
+                    T::one(), a_slice, n, a_slice, n,
+                    T::zero(), a2_slice, n as i32, )
+        };
 
         let d4_estimated = self.normest1.normest1_pow(&self.a2, 2, self.itmax)
             .powf(T::RealField::from_subset(&(1.0/4.0)));
@@ -406,14 +409,14 @@ impl<T: LapackScalar> Expm<T>
             return;
         }
 
-        {
-            let (a2_slice, _) = as_slice_with_layout(&self.a2).expect("Matrix `a2` not contiguous.");
-            let (a4_slice, _) = as_slice_with_layout_mut(&mut self.a4).expect("Matrix `a4` not contiguous.");
+        let (a2_slice, _) = as_slice_with_layout(&self.a2).expect("Matrix `a2` not contiguous.");
+        let (a4_slice, _) = as_slice_with_layout_mut(&mut self.a4).expect("Matrix `a4` not contiguous.");
+        unsafe{
             T::gemm(self.layout, cblas::Transpose::None, cblas::Transpose::None,
                     self.n as i32, self.n as i32, self.n as i32,
                     T::one(), a2_slice, n as i32, a2_slice, n as i32,
-                    T::zero(), a4_slice, n as i32,);
-        }
+                    T::zero(), a4_slice, n as i32, )
+        };
 
         let d4_precise = self.normest1.normest1(&self.a4, self.itmax)
             .powf(T::RealField::from_subset(&(1.0/4.0)));
@@ -425,15 +428,15 @@ impl<T: LapackScalar> Expm<T>
             return;
         }
 
-        {
-            let (a2_slice, _) = as_slice_with_layout(&self.a2).expect("Matrix `a2` not contiguous.");
-            let (a4_slice, _) = as_slice_with_layout(&self.a4).expect("Matrix `a4` not contiguous.");
-            let (a6_slice, _) = as_slice_with_layout_mut(&mut self.a6).expect("Matrix `a6` not contiguous.");
+        let (a2_slice, _) = as_slice_with_layout(&self.a2).expect("Matrix `a2` not contiguous.");
+        let (a4_slice, _) = as_slice_with_layout(&self.a4).expect("Matrix `a4` not contiguous.");
+        let (a6_slice, _) = as_slice_with_layout_mut(&mut self.a6).expect("Matrix `a6` not contiguous.");
+        unsafe {
             T::gemm(self.layout, cblas::Transpose::None, cblas::Transpose::None,
                     self.n as i32, self.n as i32, self.n as i32,
                     T::one(), a2_slice, n as i32, a4_slice, n as i32,
-                    T::zero(), a6_slice, n as i32,);
-        }
+                    T::zero(), a6_slice, n as i32, )
+        };
 
         let d6_precise = self.normest1.normest1(&self.a6, self.itmax)
             .powf(T::RealField::from_subset(&(1.0/6.0)));
@@ -446,14 +449,16 @@ impl<T: LapackScalar> Expm<T>
             return;
         }
 
-        {
-            let (a4_slice, _) = as_slice_with_layout(&self.a4).expect("Matrix `a4` not contiguous.");
-            let (a8_slice, _) = as_slice_with_layout_mut(&mut self.a8).expect("Matrix `a8` not contiguous.");
+
+        let (a4_slice, _) = as_slice_with_layout(&self.a4).expect("Matrix `a4` not contiguous.");
+        let (a8_slice, _) = as_slice_with_layout_mut(&mut self.a8).expect("Matrix `a8` not contiguous.");
+        unsafe {
             T::gemm(self.layout, cblas::Transpose::None, cblas::Transpose::None,
                     self.n as i32, self.n as i32, self.n as i32,
                     T::one(), a4_slice, n as i32, a4_slice, n as i32,
-                    T::zero(), a8_slice, n as i32,);
-        }
+                    T::zero(), a8_slice, n as i32, )
+        };
+
 
         if eta_3 <= T::RealField::from_subset(&THETA_9) && self.ell(9) == 0 {
             //println!("eta_3 (second) condition");
@@ -487,10 +492,12 @@ impl<T: LapackScalar> Expm<T>
         // NOTE: v initially contains r after `solve_via_pade`.
         let (v_slice, _) = as_slice_with_layout_mut(v).expect("Matrix `v` not contiguous.");
         for _ in 0..s {
-            T::gemm(self.layout, cblas::Transpose::None, cblas::Transpose::None,
-                    self.n as i32, self.n as i32, self.n as i32,
-                    T::one(), v_slice, n as i32, v_slice, n as i32,
-                    T::zero(), u_slice, n as i32,);
+            unsafe {
+                T::gemm(self.layout, cblas::Transpose::None, cblas::Transpose::None,
+                        self.n as i32, self.n as i32, self.n as i32,
+                        T::one(), v_slice, n as i32, v_slice, n as i32,
+                        T::zero(), u_slice, n as i32, )
+            };
             u_slice.swap_with_slice(v_slice);
         }
     }
@@ -567,10 +574,11 @@ impl<T: LapackScalar> Expm<T>
         };
 
         // FIXME: Handle the info for error management.
-        let _info=
+        let _info= unsafe {
             T::gesv(layout, n, n,
                     u_slice, n, pivot_slice,
-                    v_slice, n);
+                    v_slice, n)
+        };
     }
 }
 

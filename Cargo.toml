@@ -12,8 +12,7 @@ categories = ["science"]
 keywords = ["matrix", "exponential", "linalg", "ndarray", "expm"]
 
 [dependencies]
-alga = "0.9"
-lapack-traits = "0.1.0"
+lapack-traits = "0.2.3"
 cblas = "0.2"
 condest = {git="https://github.com/hmunozb/rust-condest", branch="generic-scalar"}
 lapacke = "0.2"
@@ -23,6 +22,7 @@ statrs = "0.10"
 
 
 [dev-dependencies]
+alga = "0.9.3"
 approx = "0.3.1"
 num-complex = "0.2.3"
 #openblas-src = "0.9"
