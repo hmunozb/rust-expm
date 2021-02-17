@@ -36,6 +36,7 @@ use ndarray::{
 };
 
 use lapack_traits::{LapackScalar, SupersetOf, ComplexField, RealField};
+use num_traits::Zero;
 
 // Can we calculate these at compile time?
 const THETA_3: f64 = 1.495585217958292e-2;
@@ -513,7 +514,13 @@ impl<T: LapackScalar> Expm<T>
         let c2m1  = T::RealField::from_subset( &pade_error_coefficient(m as u64));
 
         let norm_abs_a_2m1 = self.normest1.normest1_pow(&self.a_abs, 2*m + 1, self.itmax);
+        if norm_abs_a_2m1 == T::RealField::zero(){
+            return 0;
+        }
         let norm_a = self.normest1.normest1(&self.a1, self.itmax);
+        if norm_a == T::RealField::zero(){
+            return 0;
+        }
         let alpha = c2m1.abs() * norm_abs_a_2m1 / norm_a;
 
         // The unit roundoff, defined as half the machine epsilon.
