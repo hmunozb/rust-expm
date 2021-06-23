@@ -25,6 +25,8 @@
 /// [Higham, Tisseur]: http://eprints.ma.man.ac.uk/321/1/covered/MIMS_ep2006_145.pdf
 /// [Gautschi 2012]: https://doi.org/10.1007/978-0-8176-8259-0
 
+mod factorial;
+
 use condest::Normest1;
 use ndarray::{
     self,
@@ -35,8 +37,8 @@ use ndarray::{
     Zip
 };
 
-use lapack_traits::{LapackScalar, SupersetOf, ComplexField, RealField};
-use num_traits::Zero;
+use lapack_traits::LComplexField;
+use simba::scalar::{SupersetOf, ComplexField, RealField };
 
 // Can we calculate these at compile time?
 const THETA_3: f64 = 1.495585217958292e-2;
@@ -89,7 +91,7 @@ const PADE_COEFF_13: [f64; 14] = [
 ///     h(x) = \sum^\infty_{i=2m+1} C_i x^i
 /// \end{equation}
 fn pade_error_coefficient(m: u64) -> f64 {
-    use statrs::function::factorial::{binomial, factorial};
+    use crate::factorial::{binomial, factorial};
 
     return 1.0 / ( binomial(2*m, m) * factorial(2*m + 1) )
 }
@@ -128,7 +130,7 @@ trait PadeOrder {
         where S1: Data<Elem=T>,
               S2: DataMut<Elem=T>,
               S3: DataMut<Elem=T>,
-              T: LapackScalar;
+              T: LComplexField;
 }
 
 macro_rules! impl_padeorder {
@@ -153,7 +155,7 @@ impl PadeOrder for $ty {
         where S1: Data<Elem=T>,
               S2: DataMut<Elem=T>,
               S3: DataMut<Elem=T>,
-              T: LapackScalar,
+              T: LComplexField,
     {
         assert_eq!(a_powers.len(), ($m - 1)/2 + 1);
 
@@ -230,7 +232,7 @@ impl PadeOrder for PadeOrder_13 {
         where S1: Data<Elem=T>,
               S2: DataMut<Elem=T>,
               S3: DataMut<Elem=T>,
-              T: LapackScalar
+              T: LComplexField
               ,
     {
         assert_eq!(a_powers.len(), (13 - 1)/2 + 1);
@@ -246,7 +248,7 @@ impl PadeOrder for PadeOrder_13 {
             .and(a_powers[1])
             .and(a_powers[2])
             .and(a_powers[3])
-            .apply(|x, &a0, &a2, &a4, &a6| {
+            .for_each(|x, &a0, &a2, &a4, &a6| {
                 *x = *x + T::from_subset(&coefficients[1]) * a0
                         + T::from_subset(&coefficients[3]) * a2
                         + T::from_subset(&coefficients[5]) * a4
@@ -271,7 +273,7 @@ impl PadeOrder for PadeOrder_13 {
             .and(a_powers[1])
             .and(a_powers[2])
             .and(a_powers[3])
-            .apply(|x, &a2, &a4, &a6| {
+            .for_each(|x, &a2, &a4, &a6| {
                 *x =    T::from_subset(&coefficients[8]) * a2
                         + T::from_subset(&coefficients[10]) * a4
                         + T::from_subset(&coefficients[12]) * a6;
@@ -296,7 +298,7 @@ impl PadeOrder for PadeOrder_13 {
             .and(a_powers[1])
             .and(a_powers[2])
             .and(a_powers[3])
-            .apply(|x, &a0, &a2, &a4, &a6| {
+            .for_each(|x, &a0, &a2, &a4, &a6| {
                 *x = *x + T::from_subset(&coefficients[0]) * a0
                         + T::from_subset(&coefficients[2]) * a2
                         + T::from_subset(&coefficients[4]) * a4
@@ -306,7 +308,7 @@ impl PadeOrder for PadeOrder_13 {
 }
 
 /// Storage for calculating the matrix exponential.
-pub struct Expm<T: LapackScalar> {
+pub struct Expm<T: LComplexField> {
     n: usize,
     itmax: usize,
     eye: Array2<T>,
@@ -323,8 +325,8 @@ pub struct Expm<T: LapackScalar> {
     layout: cblas::Layout,
 }
 
-impl<T: LapackScalar> Expm<T>
-//where   T::RealField : LapackScalar,
+impl<T: LComplexField> Expm<T>
+//where   T::RealField : LComplexField,
 //        f64: SubsetOf<T::RealField>
 {
     /// Allocates all space to calculate the matrix exponential for a square matrix of dimension
@@ -509,7 +511,7 @@ impl<T: LapackScalar> Expm<T>
     fn ell(&mut self, m: usize) -> i32 {
         Zip::from(&mut self.a_abs)
             .and(&self.a1)
-            .apply(|x, &y| *x = T::from_real(y.abs()));
+            .for_each(|x, &y| *x = T::from_real(y.abs()));
 
         let c2m1  = T::RealField::from_subset( &pade_error_coefficient(m as u64));
 
@@ -594,7 +596,7 @@ impl<T: LapackScalar> Expm<T>
 /// NOTE: Panics if input matrices `a` and `b` don't have matching dimensions, are not square,
 /// not in row-major order, or don't have the same dimension as the `Expm` object `expm` is
 /// called on.
-pub fn expm<S1, S2, T: LapackScalar>(a: &ArrayBase<S1, Ix2>, b: &mut ArrayBase<S2, Ix2>)
+pub fn expm<S1, S2, T: LComplexField>(a: &ArrayBase<S1, Ix2>, b: &mut ArrayBase<S2, Ix2>)
     where S1: Data<Elem=T>,
           S2: DataMut<Elem=T>,
 {
@@ -654,7 +656,7 @@ mod tests {
     /// Calculates the i-th coefficient arising in the [m/m] Padé approximant of the exponential
     /// function.
     fn pade_coefficient(i: u64, m: u64) -> f64 {
-        use statrs::function::factorial::factorial;
+        use crate::factorial::factorial;
 
         assert!(i <= m, "The i-th coefficient for a [m/m] Padé approximant is undefined for i > m.");
 
@@ -714,10 +716,11 @@ mod tests {
 
     #[test]
     fn complex_exp(){
-        use alga::general::{RealField, ComplexField};
+        use simba::scalar::ComplexField;
         use approx::assert_relative_eq;
         use num_complex::Complex64 as c64;
         use num_traits::{Zero, One};
+        use std::f64::consts::PI;
 
         let _i = c64::i();
         let _sigma_x = Array2::<c64>::from_shape_vec(
@@ -725,8 +728,8 @@ mod tests {
         let _sigma_y = Array2::from_shape_vec(
             (2, 2), vec![c64::zero(), -_i, _i, c64::zero()]).unwrap();
 
-        let _sigma_mat = (&_sigma_x + &_sigma_y)/c64::from(2.0.sqrt());
-        let theta = f64::pi()/5.0;
+        let _sigma_mat = (&_sigma_x + &_sigma_y)/c64::from(2.0f64.sqrt());
+        let theta = PI/5.0;
 
         let a = &_sigma_mat * c64::from(theta) * _i ;
         let expected = Array2::<c64>::eye(2) * theta.cos()
