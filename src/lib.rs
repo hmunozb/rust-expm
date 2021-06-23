@@ -559,13 +559,13 @@ impl<T: LComplexField> Expm<T>
 
         Zip::from(&mut *v)
             .and(&self.u)
-            .apply(|x, &y| {
+            .for_each(|x, &y| {
                 *x = *x + y;
         });
 
         Zip::from(&mut self.u)
             .and(&self.work)
-            .apply(|x, &y| {
+            .for_each(|x, &y| {
                 *x = -*x + y;
         });
 
