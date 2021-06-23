@@ -509,6 +509,8 @@ impl<T: LComplexField> Expm<T>
     /// $\max(\lceil \log_2(\alpha/u) / 2m \rceil, 0)$, where
     /// $\alpha = \lvert c_{2m+1}\rvert \texttt{normest}(\lvert A\rvert^{2m+1})/\lVertA\rVert_1$.
     fn ell(&mut self, m: usize) -> i32 {
+        use num_traits::Zero;
+
         Zip::from(&mut self.a_abs)
             .and(&self.a1)
             .for_each(|x, &y| *x = T::from_real(y.abs()));
